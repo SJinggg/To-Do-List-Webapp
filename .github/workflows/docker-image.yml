@@ -1,0 +1,58 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  Build-Deploy-Frontend-to-Heroku:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Build Docker Frontend
+      env: 
+        APP_NAME_FRONTEND: to-do-list-java-webapp
+        APP_NAME_BACKEND: to-do-list-java-backend
+      run: 
+        echo "Deploying Frontend..."
+        docker login -u _ -p $HEROKU_API_KEY registry.heroku.com
+        docker build --file=frontend/frontend.dockerfile --rm=true -t registry.heroku.com/$APP_NAME_FRONTEND/web .
+        docker push registry.heroku.com/$APP_NAME_FRONTEND/web
+        docker run -e HEROKU_API_KEY=$HEROKU_API_KEY wingrunr21/alpine-heroku-cli:latest container:release web -a $APP_NAME_FRONTEND
+        echo "Frontend Deployment Complete!"
+
+  Build-Backend:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Build Backend
+      env: 
+        APP_NAME_FRONTEND: to-do-list-java-webapp
+        APP_NAME_BACKEND: to-do-list-java-backend
+      run:
+        echo "Building Backend..."
+        cd ./backend
+        gradle build
+        echo "Backend Build Complete!"
+    - name: cache
+      uses: actions/cache@v2
+      with:
+        path: ~/backend/build
+        key: v1-backend-build-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: v1-backend-build-
+    - name: artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        path: ~/backend/build/libs/*.jar
+  
+  Deploy-Backend-to-Heroku:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy to Heroku
+      run:
+        echo "Deploying Backend..."
+        docker login -u _ -p $HEROKU_API_KEY registry.heroku.com
+        docker build --file=backend/backend.dockerfile --rm=true -t registry.heroku.com/$APP_NAME_BACKEND/web .
+        docker push registry.heroku.com/$APP_NAME_BACKEND/web
+        docker run -e HEROKU_API_KEY=$HEROKU_API_KEY wingrunr21/alpine-heroku-cli:latest container:release web -a $APP_NAME_BACKEND
+        echo "Backend Deployment Complete!"
