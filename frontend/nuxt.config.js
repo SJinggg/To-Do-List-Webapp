@@ -63,6 +63,6 @@ export default {
     prefix: '/api/'
   },
   proxy: {
-    '/api/': 'http://localhost:8080/'
+    '/api/': process.env.PROXY_API || 'http://localhost:8080/'
   },
 }
